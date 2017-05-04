@@ -98,7 +98,7 @@ void Get_Sensor_Data() {
   */
 }
 
-void Estimation_Attitude() {
+void Estimation_Posture() {
   acc[0] = atan2(IMU[1], IMU[2]) * 180 / PI;
   acc[1] = atan2(-IMU[0], IMU[2]) * 180 / PI;
   //acc[2] = atan2(IMU[0], IMU[1]) * 180 / PI;
@@ -185,7 +185,7 @@ void setup() {
   Yaw_PID.SetMode(AUTOMATIC);
 
   Get_Sensor_Data();
-  Estimation_Attitude();
+  Estimation_Posture();
 
   angle[3] = RATIO * (angle[3] + gyro[0]) + (1.0 - RATIO) * acc[0];
   angle[4] = RATIO * (angle[4] + gyro[1]) + (1.0 - RATIO) * acc[1];
@@ -199,7 +199,7 @@ void loop() {
   timer = millis();
 
   Get_Sensor_Data();
-  Estimation_Attitude();
+  Estimation_Posture();
   pid_compute(&m_power[0], &m_power[1], &m_power[2], &m_power[3]);
 
   String recv_data = recvData();
