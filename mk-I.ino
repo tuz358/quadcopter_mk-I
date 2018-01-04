@@ -13,10 +13,10 @@
 #include <Wire.h>
 #include <PID_v1.h>
 
-const String ESP[] = {"\"your_wifi_ssid\"", "\"your_wifi_password\""}; //e-ssid key
-const int INTERVAL = 40;//ms ... Controll Cycle
+const String ESP[] = {"\"your_wifi_ssid\"", "\"your_wifi_password\""}; //e-ssid, psk
+const int INTERVAL = 40;  // Controll Cycle [ms]
 const int MPU = 0x68;
-const int RATIO = 0.95;//For Complementary Filter
+const int RATIO = 0.95;   // Parameter for Complementary Filter
 const int MOTORS[] = {5, 6, 9, 10};
 /*
   MOTORS[0] : Front Left
@@ -29,11 +29,11 @@ uint32_t timer;
 double dt;
 uint8_t connectionId = 0;
 uint16_t Throttle = 0;
-float acc[3];//Roll,Pitch,Yaw
-float gyro[3];//X,Y,Z
-double Outputs[3];//Roll,Pitch,Yaw
-double angle[6];//X,Y,Z,BeforeX,Y,Z
-int16_t IMU[7];//Acx,AcY,AcZ,Tmp,GyX,GyY,GyZ
+float acc[3];       // Roll,Pitch,Yaw angle calculate from acceleration
+float gyro[3];      // X,Y,Z
+double Outputs[3];  // PID outpus ... 0: Roll, 1: Pitch, 2: Yaw
+double angle[6];    // X, Y, Z, BeforeX, BeforeY, BeforeZ
+int16_t IMU[7];     // Acx, AcY, AcZ, Tmp, GyX, GyY, GyZ
 uint16_t m_power[4] = {0, 0, 0, 0};
 int8_t Recv_Data[4];
 
@@ -80,11 +80,11 @@ String recvData() {
 
 void Get_Sensor_Data() {
   Wire.beginTransmission(MPU);
-  Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
+  Wire.write(0x3B);                // starting with register 0x3B (ACCEL_XOUT_H)
   Wire.endTransmission(false);
   Wire.requestFrom(MPU, 14, true); // request a total of 14 registers
 
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 7; i++) {
     IMU[i] = Wire.read() << 8 | Wire.read();
   }
   /*
@@ -98,8 +98,8 @@ void Get_Sensor_Data() {
   */
 }
 
-void Estimation_Posture() {
-  acc[0] = atan2(IMU[1], IMU[2]) * 180 / PI;
+void Attitude_Estimation() {
+  acc[0] = atan2(IMU[1],  IMU[2]) * 180 / PI;
   acc[1] = atan2(-IMU[0], IMU[2]) * 180 / PI;
   //acc[2] = atan2(IMU[0], IMU[1]) * 180 / PI;
 
@@ -150,11 +150,11 @@ void setup() {
   sendData("AT+CIPMUX=1\r\n", 1000);
   sendData("AT+CIPSERVER=1,8530\r\n", 1000);
 
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 4; i++) {
     analogWrite(MOTORS[i], 150);
   }
   delay(5);
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 4; i++) {
     analogWrite(MOTORS[i], 0);
   }
 
@@ -185,7 +185,7 @@ void setup() {
   Yaw_PID.SetMode(AUTOMATIC);
 
   Get_Sensor_Data();
-  Estimation_Posture();
+  Attitude_Estimation();
 
   angle[3] = RATIO * (angle[3] + gyro[0]) + (1.0 - RATIO) * acc[0];
   angle[4] = RATIO * (angle[4] + gyro[1]) + (1.0 - RATIO) * acc[1];
@@ -199,7 +199,7 @@ void loop() {
   timer = millis();
 
   Get_Sensor_Data();
-  Estimation_Posture();
+  Attitude_Estimation();
   pid_compute(&m_power[0], &m_power[1], &m_power[2], &m_power[3]);
 
   String recv_data = recvData();
@@ -233,7 +233,7 @@ void loop() {
     }
   }
 
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 4; i++) {
     if (m_power[i] < 0) {
       m_power[i] = 0;
     } else if (m_power[i] > 200) {
@@ -241,13 +241,13 @@ void loop() {
     }
   }
 
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 4; i++) {
     analogWrite(MOTORS[i], m_power[i]);
   }
 
   angle[3] = angle[0];
   angle[4] = angle[1];
   angle[5] = angle[2];
-  
+
   delay(INTERVAL - (int)(millis() - timer));
 }
